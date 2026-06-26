@@ -7,28 +7,22 @@ class OperationalStrategyAgent:
     
     def __init__(self):
         self.name = "Prometheux SaaS Agent"
-        # Pull environment configurations dynamically
         self.api_url = os.getenv("PROMETHEUX_SAAS_URL", "https://api.prometheux.ai")
-        self.token = os.getenv("PROMETHEUX_TOKEN", "mock_token")
-        self.username = os.getenv("PROMETHEUX_USERNAME", "demo_user")
-        self.org = os.getenv("PROMETHEUX_ORGANIZATION", "demo_org")
+        self.token = os.getenv("PROMETHEUX_TOKEN", "")
+        self.username = os.getenv("PROMETHEUX_USERNAME", "Anupghimire1")
+        self.org = os.getenv("PROMETHEUX_ORGANIZATION", "")
 
     def execute_action(self, analysis: dict) -> bool:
-        print(f"[{self.name}] Connecting to Prometheux SaaS Engine...")
+        print(f"[{self.name}] Transmitting live state facts to Prometheux SaaS model...")
 
-        # If in simulation mode and credentials aren't set, gracefully succeed 
-        if config.USE_SIMULATION and self.token == "mock_token":
-            print(f"[{self.name} - SIMULATION] Bypassing cloud call. Logic evaluated: {analysis['recommended_strategy']}.")
-            return True
-
-        # Formulate runtime factual assertions based on ClickHouse telemetry data
+        # Construct facts array matching your Vadalog schema predicates
         payload = {
             "username": self.username,
             "organization": self.org,
-            "ontology_id": "warehouse_energy_rules",
+            "project_id": "SME_Energy_Optimization",
             "facts": [
-                {"concept": "LiveTariff", "values": ["SME_WAREHOUSE_01", analysis["tariff"]]},
-                {"concept": "CurrentLoad", "values": ["SME_WAREHOUSE_01", analysis["load_kw"]]}
+                {"concept": "LiveTariff", "values": ["SME_WAREHOUSE_01", str(analysis["tariff"])]},
+                {"concept": "LogisticsStatus", "values": ["SME_WAREHOUSE_01", str(analysis.get("docking_status", "IDLE"))]}
             ]
         }
 
@@ -38,25 +32,23 @@ class OperationalStrategyAgent:
         }
 
         try:
-            # Query the cloud reasoning gate
-            response = requests.post(f"{self.api_url}/v1/projects/reason", json=payload, headers=headers, timeout=10)
+            # Query the cloud reasoning engine endpoint
+            response = requests.post(f"{self.api_url}/v1/projects/reason", json=payload, headers=headers, timeout=12)
             
             if response.status_code == 200:
                 result = response.json()
-                # Extract actions safely derived by Vadalog rules
                 directives = result.get("derived_knowledge", {}).get("DispatchAction", [])
                 
                 if not directives:
-                    print(f"[{self.name}] SaaS Evaluation complete: No operational adjustments needed.")
+                    print(f"[{self.name}] Logic verification clear: No changes to operation schedules.")
                     return True
                 
-                for item in directives:
-                    print(f"[{self.name} - EXECUTION RULE] Triggering state change: {item['action']} on device {item['device_id']}")
+                for directive in directives:
+                    print(f"──► [ACTION EXECUTED] Prometheux Rule Triggered: {directive['values'][1]} on node {directive['values'][0]}")
                 return True
             else:
-                print(f"[{self.name} - Warning] SaaS gateway returned status code {response.status_code}. Using safe fallback.")
+                print(f"[{self.name} - Network Warning] SaaS returned status code: {response.status_code}")
                 return False
-
-        except requests.exceptions.RequestException as e:
-            print(f"[{self.name} - Error] Cloud connectivity failed: {e}. Gracefully handling fallback.")
+        except Exception as e:
+            print(f"[{self.name} - Connection Failure] Could not verify logic through Prometheux cloud node: {e}")
             return False
