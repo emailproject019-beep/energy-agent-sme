@@ -1,0 +1,20 @@
+# energy_rules.vdl
+
+# Rule 1: If a machine is non-essential and energy tariff is critical, it is a candidate for shutdown.
+ShutdownCandidate(MachineID, FacilityID) :- 
+    LiveTariff(FacilityID, CurrentPrice), 
+    CriticalThreshold(FacilityID, ThresholdPrice), 
+    CurrentPrice > ThresholdPrice, 
+    MachineProfile(MachineID, FacilityID, "Non-Essential").
+
+# Rule 2: Exception handling. If a delivery truck is docked, do NOT stop conveyor belts even if tariff is high.
+ActiveConstraint(MachineID, "BLOCKED_BY_LOGISTICS") :- 
+    ShutdownCandidate(MachineID, FacilityID),
+    MachineProfile(MachineID, FacilityID, "Conveyor"),
+    ActiveDockingBay(FacilityID, Status),
+    Status == "LOADING".
+
+# Rule 3: Definitive Action Directive passed to Agent 3
+DispatchAction(MachineID, "PAUSE_OPERATION") :- 
+    ShutdownCandidate(MachineID, FacilityID), 
+    not ActiveConstraint(MachineID, "BLOCKED_BY_LOGISTICS").
