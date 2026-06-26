@@ -3,3 +3,4 @@ pydantic==2.10.6
 python-dotenv==1.0.1
 # Added for secure Prometheux integration
 prometheux-chain==0.1.5
+clickhouse-connect==0.7.19  # Add this for native ClickHouse binary communication
