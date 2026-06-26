@@ -1,0 +1,25 @@
+# gensyn_job.yaml
+manifest_version: "1.0"
+project_name: "sme-energy-spike-predictor"
+
+compute_requirements:
+  hardware_type: "GPU"
+  minimum_vram_gb: 8
+  preferred_architectures: ["NVIDIA-RTX-3090", "NVIDIA-A10G"]
+
+environment:
+  framework: "pytorch"
+  version: "2.2.0"
+  cuda_version: "12.1"
+
+execution:
+  entry_point: "python agents/models/forecast.py"
+  dataset_uri: "ipfs://QmTX_your_clickhouse_exported_data_hash" # Training data uploaded to IPFS/S3
+  hyperparameters:
+    epochs: 50
+    batch_size: 32
+    learning_rate: 0.001
+
+verification:
+  protocol: "proof-of-learning" # Gensyn's cryptographic check against malicious nodes
+  check_interval_epochs: 5
