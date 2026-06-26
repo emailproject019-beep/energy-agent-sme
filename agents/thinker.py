@@ -1,28 +1,30 @@
-import random
-import requests
+# agents/thinker.py
 from config import config
 
-class TelemetryTariffAgent:
-    """Agent 1: Monitors real-time grid prices and warehouse consumption."""
+class PredictiveAnalyticsAgent:
+    """Agent 2: Analyzes current cost metrics and forecasts threshold violations."""
     
     def __init__(self):
-        self.name = "Telemetry & Tariff Agent"
+        self.name = "Predictive Analytics Agent"
 
-    def fetch_live_metrics(self) -> dict:
-        if config.USE_SIMULATION:
-            # Safe, predictable data simulation to prevent API failure crashes
-            return {
-                "current_tariff": round(random.uniform(0.15, 0.55), 2),
-                "warehouse_load_kw": random.randint(40, 120)
-            }
+    def evaluate_risk(self, metrics: dict) -> dict:
+        tariff = metrics.get("current_tariff", 0.0)
+        load = metrics.get("warehouse_load_kw", 0)
+        docking_status = metrics.get("docking_status", "IDLE")
         
-        try:
-            # Real-world integration layer (e.g., querying ClickHouse or external API)
-            response = requests.get(f"{config.CLICKHOUSE_URL}/api/live-metrics", timeout=5)
-            if response.status_code == 200:
-                return response.json()
-        except Exception as e:
-            print(f"[{self.name} Warning] Live data fetch failed: {e}. Defaulting to safe metrics.")
-            
-        # Fallback payload to ensure pipeline continuous execution
-        return {"current_tariff": 0.28, "warehouse_load_kw": 75}
+        # Determine if current pricing exceeds our operational threshold
+        is_peak_surge = tariff > config.PRICE_THRESHOLD
+        potential_hourly_cost = round(load * tariff, 2)
+        
+        recommendation = "CONTINUE_NORMAL_OPERATIONS"
+        if is_peak_surge:
+            recommendation = "PAUSE_NON_ESSENTIAL_HEAVY_MACHINERY"
+
+        return {
+            "tariff": tariff,
+            "load_kw": load,
+            "docking_status": docking_status,
+            "is_peak_surge": is_peak_surge,
+            "potential_hourly_cost": potential_hourly_cost,
+            "recommended_strategy": recommendation
+        }
