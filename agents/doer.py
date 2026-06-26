@@ -1,52 +1,62 @@
+import os
 import requests
 from config import config
 
 class OperationalStrategyAgent:
-    """Agent 3: Evaluates actions using the Prometheux Reasoning Engine via API/MCP."""
+    """Agent 3: Evaluates actions via the Prometheux Standalone Cloud SaaS API."""
     
     def __init__(self):
-        self.name = "Prometheux Orchestration Agent"
-        # Prometheux endpoint setup (SaaS, local Docker, or Snowflake Native App link)
-        self.prometheux_api = f"{config.PROMETHEUX_URL}/v1/reason"
+        self.name = "Prometheux SaaS Agent"
+        # Pull environment configurations dynamically
+        self.api_url = os.getenv("PROMETHEUX_SAAS_URL", "https://api.prometheux.ai")
+        self.token = os.getenv("PROMETHEUX_TOKEN", "mock_token")
+        self.username = os.getenv("PROMETHEUX_USERNAME", "demo_user")
+        self.org = os.getenv("PROMETHEUX_ORGANIZATION", "demo_org")
 
     def execute_action(self, analysis: dict) -> bool:
-        print(f"[{self.name}] Initiating ontology cross-examination...")
+        print(f"[{self.name}] Connecting to Prometheux SaaS Engine...")
 
-        # Fact payload sent into the Prometheux execution context
-        context_facts = {
-            "ontology_profile": "sme_energy_v1",
-            "runtime_facts": [
-                {"fact": "LiveTariff", "args": ["SME_WAREHOUSE_01", analysis["tariff"]]},
-                {"fact": "CriticalThreshold", "args": ["SME_WAREHOUSE_01", config.PRICE_THRESHOLD]}
+        # If in simulation mode and credentials aren't set, gracefully succeed 
+        if config.USE_SIMULATION and self.token == "mock_token":
+            print(f"[{self.name} - SIMULATION] Bypassing cloud call. Logic evaluated: {analysis['recommended_strategy']}.")
+            return True
+
+        # Formulate runtime factual assertions based on ClickHouse telemetry data
+        payload = {
+            "username": self.username,
+            "organization": self.org,
+            "ontology_id": "warehouse_energy_rules",
+            "facts": [
+                {"concept": "LiveTariff", "values": ["SME_WAREHOUSE_01", analysis["tariff"]]},
+                {"concept": "CurrentLoad", "values": ["SME_WAREHOUSE_01", analysis["load_kw"]]}
             ]
         }
 
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+
         try:
-            # Query the Prometheux reasoning platform
-            response = requests.post(
-                self.prometheux_api,
-                json=context_facts,
-                headers={"Authorization": f"Bearer {config.PROMETHEUX_API_KEY}"},
-                timeout=10
-            )
+            # Query the cloud reasoning gate
+            response = requests.post(f"{self.api_url}/v1/projects/reason", json=payload, headers=headers, timeout=10)
             
             if response.status_code == 200:
-                reasoning_result = response.json()
-                directives = reasoning_result.get("inferences", {}).get("DispatchAction", [])
+                result = response.json()
+                # Extract actions safely derived by Vadalog rules
+                directives = result.get("derived_knowledge", {}).get("DispatchAction", [])
                 
                 if not directives:
-                    print(f"[{self.name}] Prometheux safely concluded: No actions allowed under current operational rules.")
+                    print(f"[{self.name}] SaaS Evaluation complete: No operational adjustments needed.")
                     return True
-
-                for directive in directives:
-                    machine_id, action = directive["args"][0], directive["args"][1]
-                    print(f"[{self.name} - DETERMINISTIC ACTION APPROVED] Executing {action} on device {machine_id}.")
-                    # Here, the agent triggers the open-web webhook safely grounded by data provenance
+                
+                for item in directives:
+                    print(f"[{self.name} - EXECUTION RULE] Triggering state change: {item['action']} on device {item['device_id']}")
                 return True
             else:
-                print(f"[{self.name} - Error] Prometheux engine rejected request: {response.status_code}")
+                print(f"[{self.name} - Warning] SaaS gateway returned status code {response.status_code}. Using safe fallback.")
                 return False
 
-        except Exception as e:
-            print(f"[{self.name} - Error] Connection to Prometheux failed: {e}")
+        except requests.exceptions.RequestException as e:
+            print(f"[{self.name} - Error] Cloud connectivity failed: {e}. Gracefully handling fallback.")
             return False
